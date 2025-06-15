@@ -1,19 +1,20 @@
-<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
-  <modelVersion>4.0.0</modelVersion>
-  <groupId>fr.indigeo.wps</groupId>
-  <artifactId>coastLinesTracking</artifactId>
-  <version>1.3</version>
-  <name>coastLinesTracking</name>
-  
-  <properties>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+	<modelVersion>4.0.0</modelVersion>
+	<groupId>fr.indigeo.wps</groupId>
+	<artifactId>coastLinesTracking</artifactId>
+	<version>1.3</version>
+	<name>coastLinesTracking</name>
+
+	<properties>
 		<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
 		<!-- indigeo.fr geoserver version / change for your version -->
 		<!-- geotools and geoserver version are linked check geotools version in geoserver notes -->
 		<geoserver.version>2.21.5</geoserver.version>
 		<geotools.version>27.5</geotools.version>
 		<maven.compiler.target>11</maven.compiler.target>
-   		<maven.compiler.source>11</maven.compiler.source>
-		<log4j.version>1.2.17</log4j.version>
+		<maven.compiler.source>11</maven.compiler.source>
+		<log4j.version>2.17.2</log4j.version>
 	</properties>
 
 	<repositories>
@@ -50,34 +51,51 @@
 		</dependency>
 		<dependency>
 			<groupId>org.geotools</groupId>
-			<artifactId>gt-wps</artifactId>
+			<artifactId>gt-geojson-core</artifactId>
+			<version>${geotools.version}</version>
+			<scope>provided</scope>
+		</dependency>
+		<!-- Depending on geotools and geoserver version removed in geotools >30 -->
+		<!-- Those two dependencies need to be add to geoserver Lib -->
+		<dependency>
+			<groupId>org.geotools</groupId>
+			<artifactId>gt-geojson</artifactId>
 			<version>${geotools.version}</version>
 			<scope>provided</scope>
 		</dependency>
 		<dependency>
-		    <groupId>org.geotools</groupId>
-		    <artifactId>gt-geojson</artifactId>
-			<version>${geotools.version}</version>
+			<groupId>com.googlecode.json-simple</groupId>
+			<artifactId>json-simple</artifactId>
+			<version>1.1.1</version>
+			<scope>provided</scope>
+		</dependency>
+		<!-- End of dependencies to be add to geoserver lib folder -->
+		<dependency>
+			<groupId>org.apache.logging.log4j</groupId>
+			<artifactId>log4j-api</artifactId>
+			<version>${log4j.version}</version>
 			<scope>provided</scope>
 		</dependency>
 		<dependency>
-			<groupId>org.json</groupId>
-			<artifactId>json</artifactId>
-			<version>20220320</version>
-		</dependency>
-		<!-- Logger -->
-		<!-- log4j version is limited by log4j version of geoserver -->
-		<dependency>
-            <groupId>log4j</groupId>
-            <artifactId>log4j</artifactId>
-            <version>${log4j.version}</version>
+			<groupId>org.apache.logging.log4j</groupId>
+			<artifactId>log4j-core</artifactId>
+			<version>${log4j.version}</version>
 			<scope>provided</scope>
-        </dependency>
+		</dependency>
 		<dependency>
-			<groupId>junit</groupId>
-			<artifactId>junit</artifactId>
-			<version>4.13.2</version>
+			<groupId>org.junit.jupiter</groupId>
+			<artifactId>junit-jupiter</artifactId>
+			<version>5.10.2</version>
 			<scope>test</scope>
 		</dependency>
-	</dependencies>  
+	</dependencies>
+	<build>
+		<plugins>
+			<plugin>
+				<groupId>org.apache.maven.plugins</groupId>
+				<artifactId>maven-surefire-plugin</artifactId>
+				<version>3.0.0-M7</version>			
+			</plugin>
+		</plugins>
+	</build>
 </project>
