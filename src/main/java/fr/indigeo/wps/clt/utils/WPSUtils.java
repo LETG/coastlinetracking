@@ -13,9 +13,11 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
+import java.util.TreeSet;
 import java.util.concurrent.TimeUnit;
 
-import org.apache.log4j.Logger;
+import org.apache.logging.log4j.Logger;
+import org.apache.logging.log4j.LogManager;
 import org.geotools.feature.FeatureCollection;
 import org.geotools.feature.FeatureIterator;
 import org.opengis.feature.simple.SimpleFeature;
@@ -33,14 +35,15 @@ import org.locationtech.jts.geom.PrecisionModel;
 /**
  * Class utilitaire pour les services WPS de trait de côte
  * 
- * @author Fatah M'SILI
+ * @author Fatah M'SILI 
+ * @author Pierre JEGO - pierre.jeg@jdev.fr pour IEUM LETG
  *
  */
 public class WPSUtils {
 
 	private static DateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd");
 
-	private static final Logger LOGGER = Logger.getLogger(WPSUtils.class);
+	private static final Logger LOGGER = LogManager.getLogger(WPSUtils.class);
 
 	/**
 	 * @param track
@@ -254,79 +257,9 @@ public class WPSUtils {
 		return radialSegment;
 	}
 
-	/**
-	 * 
-	 * @param input radiales ou coastLines
-	 * @param type
-	 * @return
-	 * @throws Exception
-	 */
-	public static Map<String, LineString> getLinesByType(FeatureCollection<SimpleFeatureType, SimpleFeature> input,
-			int type) throws Exception {
-
-		Map<String, LineString> linesBytType = new HashMap<String, LineString>();
-		GeometryFactory geometryFactory = new GeometryFactory(new PrecisionModel(PrecisionModel.FLOATING), 2154);
-		FeatureIterator<SimpleFeature> iterator = input.features();
-		try {
-			while (iterator.hasNext()) {
-				SimpleFeature feature = iterator.next();
-				Geometry geometry = (Geometry) feature.getDefaultGeometry();
-				if (geometry instanceof LineString) {
-					LineString geomLineString = geometryFactory.createLineString(geometry.getCoordinates());
-					// 1 pour radials
-					if (type == 1) {
-
-						LOGGER.debug("getLinesByType Type Radial");
-						linesBytType.put(feature.getProperty("name").getValue().toString(), geomLineString);
-					}
-
-					// 2 pour coastLines
-					if (type == 2) {
-						LOGGER.debug("getLinesByType Type Coastlines");
-						String date = feature.getProperty("creationdate").getValue().toString();
-						date = date.substring(0, date.length() - 1);
-						LOGGER.debug("getLinesByType Coastline date :" + date);
-						linesBytType.put(date, geomLineString);
-					}
-				} else {
-					throw new Exception("Les geometries sont pas des LineString !");
-				}
-			}
-		} catch (Exception e) {
-			LOGGER.error("Error while executing getLinesByType", e);
-		} finally {
-			iterator.close();
-		}
-
-		LOGGER.debug("getLinesByType" + linesBytType.size() + " elements in response");
-		return linesBytType;
-	}
 
 	/**
-	 * 
-	 * @param map
-	 * @return
-	 */
-	public static Map<Date, LineString> sortBydate(Map<String, LineString> map) {
-
-		try {
-			if (!map.isEmpty()) {
-				Map<Date, LineString> dataToSort = new HashMap<Date, LineString>();
-				for (Map.Entry<String, LineString> entry : map.entrySet()) {
-
-					dataToSort.put(dateFormat.parse(entry.getKey()), entry.getValue());
-				}
-
-				return new TreeMap<Date, LineString>(dataToSort);
-			}
-		} catch (ParseException e) {
-			LOGGER.error("Error while executing sortBydate", e);
-		}
-
-		return null;
-	}
-
-	/**
+	 *  Retourne une liste de dates à partir d'une map de traits de côte
 	 * 
 	 * @param coastLineMap
 	 * @return
@@ -340,8 +273,8 @@ public class WPSUtils {
 				dates.add(entry.getKey());
 				LOGGER.debug("Date : " + entry.getKey());
 			}
+			LOGGER.debug("getDatesFromCoastLinesMap {} dates in list", dates.size() );
 		}
-		LOGGER.debug("getDatesFromCoastLinesMap " + dates.size() + " dates in list");
 		return dates;
 	}
 
@@ -525,36 +458,29 @@ public class WPSUtils {
 	 * @param featureCollection
 	 * @return
 	 */
-	public static List<Date> getDatesFromFeatures(
+	public static TreeSet<Date> getDatesFromFeatures(
 			FeatureCollection<SimpleFeatureType, SimpleFeature> featureCollection) {
 
-		List<Date> listOfDate = new ArrayList<Date>();
-		LOGGER.debug("getDatesFromFeatures nb element in collection features " + featureCollection.size());
+		// use TreeSet to have unique dates and sorted
+		TreeSet<Date> listOfDate = new TreeSet<Date>();
+		LOGGER.debug("getDatesFromFeatures nb element in collection features {}", featureCollection.size());
 		FeatureIterator<SimpleFeature> iterator = featureCollection.features();
 		try {
 			while (iterator.hasNext()) {
 				SimpleFeature feature = iterator.next();
 				Date fromDate = dateFormat.parse(feature.getProperty("fromDate").getValue().toString());
 				Date toDate = dateFormat.parse(feature.getProperty("toDate").getValue().toString());
-
-				if (!listOfDate.contains(fromDate)) {
-					listOfDate.add(fromDate);
-				}
-
-				if (!listOfDate.contains(toDate)) {
-					listOfDate.add(toDate);
-				}
-				LOGGER.debug("FromDate : " + fromDate.toString() + " - toDate : " + toDate.toString());
+				listOfDate.add(fromDate);
+				listOfDate.add(toDate);
+		
+				LOGGER.debug("FromDate : {} - toDate : {}", fromDate.toString(), toDate.toString());
 			}
-
-			Collections.sort(listOfDate);
 
 		} catch (Exception e) {
 			LOGGER.error("Error while executing getDatesFromFeatures", e);
 		} finally {
 			iterator.close();
 		}
-
 		return listOfDate;
 	}
 
@@ -563,27 +489,22 @@ public class WPSUtils {
 	 * @param featureCollection
 	 * @return
 	 */
-	public static List<Integer> getRadialsNameFromFeatures(
+	public static TreeSet<Integer> getRadialsNameFromFeatures(
 			FeatureCollection<SimpleFeatureType, SimpleFeature> featureCollection) {
-		List<Integer> listOfRadialsName = new ArrayList<Integer>();
+		TreeSet<Integer> listOfRadialsName = new TreeSet<Integer>();
 		FeatureIterator<SimpleFeature> iterator = featureCollection.features();
 		try {
 			while (iterator.hasNext()) {
 				SimpleFeature feature = iterator.next();
 				int radiale = Integer.valueOf(feature.getProperty("radiale").getValue().toString());
-
-				if (!listOfRadialsName.contains(radiale))
-					listOfRadialsName.add(radiale);
-
+				listOfRadialsName.add(radiale);
 			}
-
 		} catch (Exception e) {
 			LOGGER.error("Error while executing getRadialsNameFromFeatures", e);
 		} finally {
 			iterator.close();
 		}
 
-		Collections.sort(listOfRadialsName);
 		return listOfRadialsName;
 	}
 
@@ -627,4 +548,74 @@ public class WPSUtils {
 		}
 		return -1;
 	}
+
+	public static Map<String, LineString> mapRadials(FeatureCollection<SimpleFeatureType, SimpleFeature> input) {
+		Map<String, LineString> mapRadials = new HashMap<String, LineString>();
+		GeometryFactory geometryFactory = new GeometryFactory(new PrecisionModel(PrecisionModel.FLOATING), 2154);
+		FeatureIterator<SimpleFeature> iterator = input.features();
+		try {
+			while (iterator.hasNext()) {
+				SimpleFeature feature = iterator.next();
+				Geometry geometry = (Geometry) feature.getDefaultGeometry();
+				if (geometry instanceof LineString) {
+					LineString geomLineString = geometryFactory.createLineString(geometry.getCoordinates());
+					mapRadials.put(feature.getProperty("name").getValue().toString(), geomLineString);
+				} else {
+					throw new Exception("Les geometries sont pas des LineString !");
+				}
+			}
+		} catch (Exception e) {
+			LOGGER.error("Error while executing mapRadials", e);
+		} finally {
+			iterator.close();
+		}
+
+		LOGGER.debug("mapRadials - {} elements in response", mapRadials.size());
+		return mapRadials;
+	}
+
+
+    public static Map<Date, LineString> mapCoastlines(FeatureCollection<SimpleFeatureType, SimpleFeature> input) {
+        // use Treemap to order by date
+		Map<Date, LineString> mapCoastlines = new TreeMap<>();
+		GeometryFactory geometryFactory = new GeometryFactory(new PrecisionModel(PrecisionModel.FLOATING), 2154);
+		FeatureIterator<SimpleFeature> iterator = input.features();
+		try {
+			while (iterator.hasNext()) {
+				SimpleFeature feature = iterator.next();
+				Geometry geometry = (Geometry) feature.getDefaultGeometry();
+				if (geometry instanceof LineString) {
+					LineString geomLineString = geometryFactory.createLineString(geometry.getCoordinates());
+					// Depending on geoserver version date in json can be a String or Date
+					if (feature.getProperty("creationdate").getValue() instanceof String) {
+						String dateString = feature.getProperty("creationdate").getValue().toString();
+						try {
+							Date date = dateFormat.parse(dateString);
+							LOGGER.debug("mapCoastlines Coastline date {}:", date);
+							mapCoastlines.put(date, geomLineString);
+						} catch (ParseException e) {
+							LOGGER.error("Error parsing date from string: {}", dateString, e);
+						}
+					} else if (feature.getProperty("creationdate").getValue() instanceof Date) {
+						LOGGER.debug("creationdate type {}:", feature.getProperty("creationdate").getValue().getClass());
+						Date date = (Date) feature.getProperty("creationdate").getValue();
+						LOGGER.debug("mapCoastlines Coastline date {}:", date);
+						mapCoastlines.put(date, geomLineString);
+					} else {
+						LOGGER.error("Unsupported date type: " + feature.getProperty("creationdate").getValue().getClass());
+					}
+				} else {
+					throw new Exception("Les geometries sont pas des LineString !");
+				}
+			}
+		} catch (Exception e) {
+			LOGGER.error("Error while executing mapCoastlines", e);
+		} finally {
+			iterator.close();
+		}
+
+		LOGGER.debug("mapCoastlines - {} elements in response", mapCoastlines.size());
+		return mapCoastlines;
+    }
+
 }
