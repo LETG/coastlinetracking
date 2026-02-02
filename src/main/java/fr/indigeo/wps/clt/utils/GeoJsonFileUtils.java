@@ -7,13 +7,13 @@ import java.io.FileOutputStream;
 import java.io.FileReader;
 import java.io.IOException;
 
-import org.apache.log4j.Logger;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 import org.geotools.feature.FeatureCollection;
 import org.geotools.feature.FeatureIterator;
 import org.geotools.geojson.feature.FeatureJSON;
 import org.geotools.geojson.geom.GeometryJSON;
-import org.json.JSONException;
-import org.json.JSONObject;
+import org.json.simple.JSONObject;
 import org.json.simple.parser.JSONParser;
 import org.json.simple.parser.ParseException;
 import org.opengis.feature.simple.SimpleFeature;
@@ -21,9 +21,16 @@ import org.opengis.feature.simple.SimpleFeatureType;
 
 import org.locationtech.jts.geom.Geometry;
 
+//TODO see class have to be updated when using new version of GeoTools
+
+/**
+ * @author Fatah M'SILI 
+ * @author Pierre JEGO - pierre.jeg@jdev.fr pour IEUM LETG
+ *
+ */
 public class GeoJsonFileUtils {
 
-	private static final Logger LOGGER = Logger.getLogger(GeoJsonFileUtils.class);
+	private static final Logger LOGGER = LogManager.getLogger(GeoJsonFileUtils.class);
 
 	private static final String POINT = "Point";
 	private static final String MULTIPOINT = "MultiPoint";
@@ -31,46 +38,37 @@ public class GeoJsonFileUtils {
 	private static final String MULTILINESTRING = "MultiLineString";
 	private static final String POLYGON = "Polygon";
 	private static final String MULTIPOLYGON = "MultiPolygon";
-	// private static final String GEOMETRY_COLLECTION = "GeometryCollection";
 	private static GeometryJSON geometryJSON;
 	private static FeatureJSON featureJSON;
 
-	private static String geoJsonToString(File jsonFile) throws FileNotFoundException, IOException, ParseException {
+	private static JSONObject geoJsonFileToObject(File jsonFile) throws FileNotFoundException, IOException, ParseException {
 
 		JSONParser jsonParser = new JSONParser();
-		String data = jsonParser.parse(new FileReader(jsonFile)).toString();
-
+		JSONObject data = (JSONObject) jsonParser.parse(new FileReader(jsonFile));		
 		return data;
 	}
 
 	public static boolean isFeatureCollectionData(File jsonFile) throws FileNotFoundException, IOException {
 
 		try {
-			String data = geoJsonToString(jsonFile);
-			JSONObject jsonData = new JSONObject(data);
+			JSONObject jsonData = geoJsonFileToObject(jsonFile);
 			return jsonData.get("type").equals("FeatureCollection");
 		} catch (ParseException e) {
 			return false;
-		} catch (JSONException e) {
-			return false;
-		}
+		} 
 
 	}
 
 	public static boolean isGeometryData(File jsonFile) throws FileNotFoundException, IOException {
 
 		try {
-			String data = geoJsonToString(jsonFile);
-			JSONObject jsonData = new JSONObject(data);
+			JSONObject jsonData = geoJsonFileToObject(jsonFile);
 			String type = jsonData.get("type").toString();
 			return type.matches(POINT + "|" + MULTIPOINT + "|" + LINESTRING + "|" + MULTILINESTRING + "|" + POLYGON
 					+ "|" + MULTIPOLYGON);
 		} catch (ParseException e) {
 			return false;
-		} catch (JSONException e) {
-			return false;
-		}
-
+		} 
 	}
 
 	public static void geometryToGeoJsonFile(Geometry geometry, String path) throws FileNotFoundException, IOException {

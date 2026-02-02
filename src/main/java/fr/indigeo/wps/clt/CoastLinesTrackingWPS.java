@@ -9,8 +9,10 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.TreeSet;
 
-import org.apache.log4j.Logger;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 import org.geoserver.wps.gs.GeoServerProcess;
 import org.geotools.feature.DefaultFeatureCollection;
 import org.geotools.feature.FeatureCollection;
@@ -22,8 +24,8 @@ import org.geotools.process.factory.DescribeProcess;
 import org.geotools.process.factory.DescribeResult;
 import org.geotools.process.factory.StaticMethodsProcessFactory;
 import org.geotools.text.Text;
-import org.json.JSONArray;
-import org.json.JSONObject;
+import org.json.simple.JSONArray;
+import org.json.simple.JSONObject;
 import org.opengis.feature.Property;
 import org.opengis.feature.simple.SimpleFeature;
 import org.opengis.feature.simple.SimpleFeatureType;
@@ -38,14 +40,15 @@ import org.locationtech.jts.geom.Point;
 import java.util.Comparator;
 
 /**
- * @author lecteur
+ * @author Fatah M'SILI 
+ * @author Pierre JEGO - pierre.jeg@jdev.fr pour IEUM LETG
  *
  */
 @DescribeProcess(title = "Coastlines tracking project", description = "WPS for the tracking of coastlines")
 public class CoastLinesTrackingWPS extends StaticMethodsProcessFactory<CoastLinesTrackingWPS>
 		implements GeoServerProcess {
 
-	private static final Logger LOGGER = Logger.getLogger(CoastLinesTrackingWPS.class);
+	private static final Logger LOGGER = LogManager.getLogger(CoastLinesTrackingWPS.class);
 
 	private static DateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd");
 
@@ -69,8 +72,8 @@ public class CoastLinesTrackingWPS extends StaticMethodsProcessFactory<CoastLine
 			@DescribeParameter(name = "radialDirection", description = "the direction of radial (true or false)") final boolean direction) {
 		DefaultFeatureCollection resultFeatureCollection = null;
 
-		LOGGER.info("DrawRadial with params - length : " + length + " | distance : " + distance + " | direction : "
-				+ direction);
+		LOGGER.info("DrawRadial with params - length : {} | distance :  {} | direction : {} ", length, distance, direction );
+
 		try {
 			SimpleFeatureTypeBuilder simpleFeatureTypeBuilder = new SimpleFeatureTypeBuilder();
 			simpleFeatureTypeBuilder.setName("featureType");
@@ -87,10 +90,8 @@ public class CoastLinesTrackingWPS extends StaticMethodsProcessFactory<CoastLine
 			LinkedList<LineString> listRadiales = new LinkedList<LineString>();
 			LineString radiale = null;
 
-			// create radials
-			if (LOGGER.isDebugEnabled()) {
-				LOGGER.debug("Create radials with " + segements.size() + " elements");
-			}
+			LOGGER.debug("Create radials with {} elements", segements.size());
+
 			int n = 0;
 			for (LineString l : segements) {
 				if (n == 0) {
@@ -129,7 +130,9 @@ public class CoastLinesTrackingWPS extends StaticMethodsProcessFactory<CoastLine
 	}
 
 	/**
-	 * @param raidalResultFeatureCollection
+	 * 
+	 * @param radials
+	 * @param coastLines
 	 * @return
 	 */
 	@DescribeProcess(title = "Calculate distances between coastlines", description = "calculate distances between coastlines using radials intersection.")
@@ -157,9 +160,10 @@ public class CoastLinesTrackingWPS extends StaticMethodsProcessFactory<CoastLine
 					simpleFeatureTypeBuilder.buildFeatureType());
 
 			// radiales calculées
-			Map<String, LineString> radialsMap = WPSUtils.getLinesByType(radials, 1);
+			Map<String, LineString> radialsMap = WPSUtils.mapRadials(radials);
 			// trait de côte calculé ou fourni en entrée
-			Map<Date, LineString> coastLinesMap = WPSUtils.sortBydate(WPSUtils.getLinesByType(coastLines, 2));
+			Map<Date, LineString> coastLinesMap = WPSUtils.mapCoastlines(coastLines);
+			//
 			List<Date> dates = WPSUtils.getDatesFromCoastLinesMap(coastLinesMap);
 			Optional<Date> minDateRef = dates.stream().min(Comparator.naturalOrder());
 			// calcul de tous les points d'intersection entre geom radiales et geom trait de côte
@@ -191,7 +195,7 @@ public class CoastLinesTrackingWPS extends StaticMethodsProcessFactory<CoastLine
 				Point dateRefPoint = null;
 				double previousDist = 0;
 				for (Map.Entry<Date[], LineString> dateLine : radialLines.getValue().entrySet()) {
-					LOGGER.debug("Traitement de l'id : " + id);
+					LOGGER.debug("Traitement de l'id : {}", id);
 					double distFromStart = 0;
 					// point de fin de la ligne
 					Point endPoint = dateLine.getValue().getEndPoint();
@@ -244,7 +248,7 @@ public class CoastLinesTrackingWPS extends StaticMethodsProcessFactory<CoastLine
 					// taux d'évolution depuis la date de référence
 					int nbrJoursFromDateRef = WPSUtils.getNbrDaysBetweenTwoDate(minDateRef.get(),
 							dateLine.getKey()[1]);
-					double nbYears = nbrJoursFromDateRef / 365;
+					double nbYears = (double)nbrJoursFromDateRef / (double)365;
 					double taux = distFromDateRef / nbYears;
 					// Taux entre les deux années de la ligne
 					double evolBetween = (distFromStart / nbrJours) * 365;
@@ -278,7 +282,7 @@ public class CoastLinesTrackingWPS extends StaticMethodsProcessFactory<CoastLine
 	public static String getDistancesToCSV(
 			@DescribeParameter(name = "distancesFeatureCollection", description = "the result distance feature collection") final FeatureCollection<SimpleFeatureType, SimpleFeature> distances) {
 
-		List<Date> dates = WPSUtils.getDatesFromFeatures(distances);
+		TreeSet<Date> dates = WPSUtils.getDatesFromFeatures(distances);
 
 		String sep = "|";
 		String eol = "\n";
@@ -287,6 +291,10 @@ public class CoastLinesTrackingWPS extends StaticMethodsProcessFactory<CoastLine
 		String rad = "rad";
 		String csv = "";
 
+		if(dates.isEmpty()) {
+			LOGGER.warn("No dates found in distances feature collection.");
+			return "No data available.";
+		}
 		List<String> dataList = new ArrayList<String>();
 
 		for (Date d : dates) {
@@ -307,12 +315,12 @@ public class CoastLinesTrackingWPS extends StaticMethodsProcessFactory<CoastLine
 
 		for (Integer radiale : WPSUtils.getRadialsNameFromFeatures(distances)) {
 			String data = radiale + sep;
-			for (int i = 1; i < dates.size(); i++) {
+			for (Date currentDate : dates){
 
-				double cumulateDist = WPSUtils.getDistanceByType(distances, 1, dates.get(i), radiale);
-				double taux = WPSUtils.getDistanceByType(distances, 3, dates.get(i), radiale);
-				double distFromStart = WPSUtils.getDistanceByType(distances, 4, dates.get(i), radiale);
-				double fromDateRefDist = WPSUtils.getDistanceByType(distances, 5, dates.get(i), radiale);
+				double cumulateDist = WPSUtils.getDistanceByType(distances, 1, currentDate, radiale);
+				double taux = WPSUtils.getDistanceByType(distances, 3, currentDate, radiale);
+				double distFromStart = WPSUtils.getDistanceByType(distances, 4, currentDate, radiale);
+				double fromDateRefDist = WPSUtils.getDistanceByType(distances, 5, currentDate, radiale);
 
 				if (cumulateDist != -1)
 					data = data + cumulateDist + ";";
@@ -354,7 +362,7 @@ public class CoastLinesTrackingWPS extends StaticMethodsProcessFactory<CoastLine
 	public static String getDistancesToJson(
 			@DescribeParameter(name = "distancesFeatureCollection", description = "the result distance feature collection") final FeatureCollection<SimpleFeatureType, SimpleFeature> distances) {
 
-		List<Date> TDCdates = WPSUtils.getDatesFromFeatures(distances);
+		TreeSet<Date> TDCdates = WPSUtils.getDatesFromFeatures(distances);
 
 		JSONObject result = new JSONObject();
 		JSONArray resultsArray = new JSONArray();
@@ -382,7 +390,7 @@ public class CoastLinesTrackingWPS extends StaticMethodsProcessFactory<CoastLine
 						tdcdata.put("tauxRecul", (Double) feature.getProperty("taux_recul").getValue());
 						tdcdata.put("fromStartDist", (Double) feature.getProperty("fromStartDist").getValue());
 						tdcdata.put("fromDateRefDist", (Double) feature.getProperty("fromDateRefDist").getValue());
-						tdcValues.put(tdcdata);
+						tdcValues.add(tdcdata);
 					}
 				}
 				tdc.put("data", tdcValues);
@@ -393,7 +401,7 @@ public class CoastLinesTrackingWPS extends StaticMethodsProcessFactory<CoastLine
 			} finally {
 				iterator.close();
 			}
-			resultsArray.put(tdc);
+			resultsArray.add(tdc);
 		}
 		result.put("result", resultsArray);
 		return result.toString();
@@ -403,9 +411,12 @@ public class CoastLinesTrackingWPS extends StaticMethodsProcessFactory<CoastLine
 	@DescribeResult(name = "jsonString", description = "the result of coastLinesTracking WPS")
 	public static String coastLinesTracking(
 			@DescribeParameter(name = "radiales", description = "the calculated radial") final FeatureCollection<SimpleFeatureType, SimpleFeature> radiales,
-			@DescribeParameter(name = "coastlines", description = "the input Coastlines") final FeatureCollection<SimpleFeatureType, SimpleFeature> coastLines) {
+			@DescribeParameter(name = "coastlines", description = "the input Coastlines") final FeatureCollection<SimpleFeatureType, SimpleFeature> coastlines) {
 
 		if (LOGGER.isDebugEnabled()) {
+			LOGGER.debug("Input coastline is empty - {} ", coastlines.isEmpty());
+			LOGGER.debug("coastlines class : {}", coastlines.getClass());
+			LOGGER.debug("radiales class : {}", radiales.getClass());
 			LOGGER.debug("Radial information : ");
 			FeatureIterator<SimpleFeature> iteratorfc1 = radiales.features();
 			try {
@@ -421,9 +432,10 @@ public class CoastLinesTrackingWPS extends StaticMethodsProcessFactory<CoastLine
 			}
 		}
 
-		FeatureCollection<SimpleFeatureType, SimpleFeature> fc2 = getDistances(radiales, coastLines);
+		FeatureCollection<SimpleFeatureType, SimpleFeature> fc2 = getDistances(radiales, coastlines);
 
 		if (LOGGER.isDebugEnabled()) {
+			LOGGER.debug(coastlines.size() + " coastlines features to process");
 			LOGGER.debug("Distance information : ");
 			FeatureIterator<SimpleFeature> iteratorfc2 = fc2.features();
 			try {
